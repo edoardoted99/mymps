@@ -4,6 +4,8 @@ MPS compute coprocessor — use a Mac with Apple Silicon as a remote GPU from Li
 
 Supports: HuggingFace models (any type), TorchScript models, checkpoint + class loading, and ~100 whitelisted torch operations (matmul, softmax, conv2d, SVD, ...).
 
+![Dashboard](screenshots/dashboard.png)
+
 ## Architecture
 
 ```
@@ -106,13 +108,18 @@ python -m mymps.dashboard
 # opens at http://localhost:8080
 ```
 
-Web UI for monitoring server health, managing models, and running compute operations.
+Real-time monitoring dashboard showing server health and system stats (CPU, memory, MPS GPU usage) with auto-refresh.
+
+### 6. AI agent integration
+
+See [`PROTOCOL.md`](PROTOCOL.md) for a complete prompt you can give to an AI agent so it knows how to use mymps as a compute backend.
 
 ## API
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Server status + MPS device info |
+| `GET` | `/stats` | System resource usage (CPU, memory, MPS GPU) |
 | `GET` | `/models` | List loaded models |
 | `POST` | `/models/load` | Load a model (huggingface / torchscript / checkpoint) |
 | `DELETE` | `/models/{name}` | Unload a model |
