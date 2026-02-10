@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 
-import numpy as np
-from flask import Flask, render_template, request
+from flask import Flask, render_template
 
 from mymps.client.client import MympsClient
 from mymps.protocol import DEFAULT_HOST, DEFAULT_PORT
@@ -48,62 +46,5 @@ def create_app() -> Flask:
             return render_template("_models.html", models=models)
         except Exception:
             return render_template("_models.html", models=[])
-
-    # ── Actions ──────────────────────────────────────────────────────
-
-    @app.post("/actions/load")
-    def action_load():
-        name = request.form.get("name", "").strip()
-        model_type = request.form.get("model_type", "huggingface").strip()
-        dtype = request.form.get("dtype", "float16").strip()
-        model_path = request.form.get("model_path", "").strip() or None
-        model_class = request.form.get("model_class", "").strip() or None
-        if not name:
-            return "<p class='err'>Model name required</p>", 400
-        try:
-            with _client() as c:
-                result = c.load_model(
-                    name,
-                    model_type=model_type,
-                    dtype=dtype,
-                    model_path=model_path,
-                    model_class=model_class,
-                )
-            return f"<p class='ok'>Loaded <b>{result['name']}</b> on {result['device']}</p>"
-        except Exception as exc:
-            return f"<p class='err'>{exc}</p>", 500
-
-    @app.post("/actions/unload")
-    def action_unload():
-        name = request.form.get("name", "").strip()
-        if not name:
-            return "<p class='err'>Model name required</p>", 400
-        try:
-            with _client() as c:
-                c.unload_model(name)
-            return f"<p class='ok'>Unloaded <b>{name}</b></p>"
-        except Exception as exc:
-            return f"<p class='err'>{exc}</p>", 500
-
-    @app.post("/actions/exec")
-    def action_exec():
-        op = request.form.get("op", "").strip()
-        tensor_json = request.form.get("tensors", "").strip()
-        kwargs_json = request.form.get("kwargs", "").strip()
-        if not op:
-            return "<p class='err'>Operation name required</p>", 400
-        if not tensor_json:
-            return "<p class='err'>Tensor data required (JSON)</p>", 400
-        try:
-            raw_tensors = json.loads(tensor_json)
-            inputs = {k: np.array(v, dtype=np.float32) for k, v in raw_tensors.items()}
-            kwargs = json.loads(kwargs_json) if kwargs_json else {}
-            with _client() as c:
-                result = c.exec(op, inputs, **kwargs)
-            # Format result for display
-            formatted = {k: v.tolist() for k, v in result.items()}
-            return render_template("_exec_result.html", op=op, result=formatted)
-        except Exception as exc:
-            return f"<p class='err'>{exc}</p>", 500
 
     return app

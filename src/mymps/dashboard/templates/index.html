@@ -19,9 +19,6 @@
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
           padding: 1.25rem; margin-bottom: 1.25rem; }
 
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
-  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
-
   .kv { display: flex; justify-content: space-between; padding: 0.3rem 0;
         border-bottom: 1px solid var(--border); }
   .kv:last-child { border-bottom: none; }
@@ -39,37 +36,12 @@
   tr:last-child td { border-bottom: none; }
   .empty { color: var(--fg2); font-style: italic; padding: 0.5rem 0; }
 
-  input, select { background: var(--bg); color: var(--fg); border: 1px solid var(--border);
-         border-radius: 4px; padding: 0.4rem 0.6rem; font-family: inherit; font-size: 0.9rem; width: 100%; }
-  input:focus, select:focus { outline: none; border-color: var(--blue); }
-  textarea { background: var(--bg); color: var(--fg); border: 1px solid var(--border);
-             border-radius: 4px; padding: 0.4rem 0.6rem; font-family: inherit; font-size: 0.9rem;
-             width: 100%; resize: vertical; min-height: 80px; }
-
-  .row { display: flex; gap: 0.5rem; align-items: end; margin-bottom: 0.5rem; }
-  .row > * { flex: 1; }
-  label { display: block; color: var(--fg2); font-size: 0.8rem; margin-bottom: 0.2rem; }
-
-  button { background: var(--blue); color: var(--bg); border: none; border-radius: 4px;
-           padding: 0.45rem 1rem; font-family: inherit; font-size: 0.9rem; cursor: pointer;
-           font-weight: 600; white-space: nowrap; }
-  button:hover { opacity: 0.9; }
-  button.danger { background: var(--red); }
-
-  .ok { color: var(--green); }
   .err { color: var(--red); }
-  .warn { color: var(--yellow); }
-
-  .result-box { background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
-                padding: 0.75rem; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-word; }
-  .stats { color: var(--fg2); font-size: 0.85rem; margin-top: 0.4rem; }
 
   .htmx-indicator { display: none; }
   .htmx-request .htmx-indicator { display: inline; }
   .htmx-request.htmx-indicator { display: inline; }
   .spinner { color: var(--yellow); }
-
-  #feedback { min-height: 1.5rem; margin-top: 0.5rem; }
 </style>
 </head>
 <body>
@@ -89,78 +61,17 @@
   </div>
 </div>
 
-<div class="grid">
-
-  <!-- ── Models ──────────────────────────────────────── -->
-  <div class="card">
-    <h2>Loaded Models
-      <span class="spinner htmx-indicator" id="models-spinner">...</span>
-    </h2>
-    <div id="models-panel"
-         hx-get="/partials/models"
-         hx-trigger="load, every 5s, modelsChanged from:body"
-         hx-indicator="#models-spinner">
-      <span class="fg2">loading...</span>
-    </div>
-  </div>
-
-  <!-- ── Load / Unload ──────────────────────────────── -->
-  <div class="card">
-    <h2>Model Management</h2>
-    <form hx-post="/actions/load" hx-target="#mgmt-feedback" hx-on::after-request="htmx.trigger(document.body, 'modelsChanged')">
-      <div class="row">
-        <div style="flex:2"><label>Model name / path</label>
-          <input name="name" placeholder="bert-base-uncased" required></div>
-        <div style="flex:1"><label>Type</label>
-          <select name="model_type">
-            <option value="huggingface">huggingface</option>
-            <option value="torchscript">torchscript</option>
-            <option value="checkpoint">checkpoint</option>
-          </select></div>
-        <div style="flex:1"><label>dtype</label>
-          <select name="dtype"><option>float16</option><option>float32</option><option>bfloat16</option></select></div>
-      </div>
-      <div class="row">
-        <div style="flex:2"><label>Model path (torchscript/checkpoint)</label>
-          <input name="model_path" placeholder="/path/to/model.pt"></div>
-        <div style="flex:2"><label>Model class (checkpoint)</label>
-          <input name="model_class" placeholder="mymodule.MyModel"></div>
-        <div style="flex:0"><button type="submit">Load</button></div>
-      </div>
-    </form>
-    <form hx-post="/actions/unload" hx-target="#mgmt-feedback" hx-on::after-request="htmx.trigger(document.body, 'modelsChanged')"
-          style="margin-top: 0.5rem;">
-      <div class="row">
-        <div style="flex:3"><label>Model to unload</label>
-          <input name="name" placeholder="bert-base-uncased" required></div>
-        <div style="flex:0"><button type="submit" class="danger">Unload</button></div>
-      </div>
-    </form>
-    <div id="mgmt-feedback"></div>
-  </div>
-
-</div>
-
-<!-- ── Compute ──────────────────────────────────────── -->
+<!-- ── Models ──────────────────────────────────────── -->
 <div class="card">
-  <h2>Compute</h2>
-  <form hx-post="/actions/exec" hx-target="#exec-result" hx-indicator="#exec-spinner">
-    <div class="row">
-      <div style="flex:2"><label>Operation</label>
-        <input name="op" placeholder="matmul" required></div>
-    </div>
-    <div style="margin-bottom: 0.5rem;">
-      <label>Tensors (JSON, e.g. {"0": [[1,2],[3,4]], "1": [[5,6],[7,8]]})</label>
-      <textarea name="tensors" placeholder='{"0": [[1,2],[3,4]], "1": [[5,6],[7,8]]}' required></textarea>
-    </div>
-    <div style="margin-bottom: 0.5rem;">
-      <label>Kwargs (JSON, optional, e.g. {"dim": -1})</label>
-      <input name="kwargs" placeholder='{"dim": -1}'>
-    </div>
-    <button type="submit">Execute</button>
-    <span class="spinner htmx-indicator" id="exec-spinner"> computing...</span>
-  </form>
-  <div id="exec-result"></div>
+  <h2>Loaded Models
+    <span class="spinner htmx-indicator" id="models-spinner">...</span>
+  </h2>
+  <div id="models-panel"
+       hx-get="/partials/models"
+       hx-trigger="load, every 5s"
+       hx-indicator="#models-spinner">
+    <span class="fg2">loading...</span>
+  </div>
 </div>
 
 </body>
