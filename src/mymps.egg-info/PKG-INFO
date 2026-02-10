@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: mymps
+Version: 0.1.0
+Summary: Remote MPS inference server — offload ML workloads to Apple Silicon via SSH tunnel
+Requires-Python: >=3.10
+Requires-Dist: httpx>=0.27
+Requires-Dist: websockets>=13.0
+Requires-Dist: msgpack>=1.0
+Requires-Dist: numpy>=1.26
+Provides-Extra: server
+Requires-Dist: torch>=2.1; extra == "server"
+Requires-Dist: transformers>=4.36; extra == "server"
+Requires-Dist: accelerate>=0.25; extra == "server"
+Requires-Dist: diffusers>=0.25; extra == "server"
+Requires-Dist: uvicorn[standard]>=0.24; extra == "server"
+Requires-Dist: fastapi>=0.108; extra == "server"
+Requires-Dist: sentencepiece>=0.2; extra == "server"
