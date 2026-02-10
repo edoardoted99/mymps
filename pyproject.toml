@@ -24,6 +24,9 @@ server = [
     "fastapi>=0.108",
     "sentencepiece>=0.2",
 ]
+dashboard = [
+    "flask>=3.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

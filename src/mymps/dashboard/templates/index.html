@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mymps dashboard</title>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<style>
+  :root { --bg: #0d1117; --card: #161b22; --border: #30363d; --fg: #e6edf3;
+          --fg2: #8b949e; --green: #3fb950; --red: #f85149; --blue: #58a6ff; --yellow: #d29922; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+         background: var(--bg); color: var(--fg); padding: 1.5rem; max-width: 960px; margin: 0 auto;
+         font-size: 14px; line-height: 1.6; }
+  h1 { font-size: 1.4rem; margin-bottom: 1.5rem; color: var(--blue); font-weight: 600; }
+  h2 { font-size: 1rem; margin-bottom: 0.75rem; color: var(--fg2); text-transform: uppercase;
+       letter-spacing: 0.05em; font-weight: 500; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+          padding: 1.25rem; margin-bottom: 1.25rem; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
+  .kv { display: flex; justify-content: space-between; padding: 0.3rem 0;
+        border-bottom: 1px solid var(--border); }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: var(--fg2); }
+  .kv .v { font-weight: 600; }
+
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.off { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: var(--fg2); font-weight: 500; padding: 0.4rem 0.6rem;
+       border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  .empty { color: var(--fg2); font-style: italic; padding: 0.5rem 0; }
+
+  input, select { background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+         border-radius: 4px; padding: 0.4rem 0.6rem; font-family: inherit; font-size: 0.9rem; width: 100%; }
+  input:focus, select:focus { outline: none; border-color: var(--blue); }
+  textarea { background: var(--bg); color: var(--fg); border: 1px solid var(--border);
+             border-radius: 4px; padding: 0.4rem 0.6rem; font-family: inherit; font-size: 0.9rem;
+             width: 100%; resize: vertical; min-height: 80px; }
+
+  .row { display: flex; gap: 0.5rem; align-items: end; margin-bottom: 0.5rem; }
+  .row > * { flex: 1; }
+  label { display: block; color: var(--fg2); font-size: 0.8rem; margin-bottom: 0.2rem; }
+
+  button { background: var(--blue); color: var(--bg); border: none; border-radius: 4px;
+           padding: 0.45rem 1rem; font-family: inherit; font-size: 0.9rem; cursor: pointer;
+           font-weight: 600; white-space: nowrap; }
+  button:hover { opacity: 0.9; }
+  button.danger { background: var(--red); }
+
+  .ok { color: var(--green); }
+  .err { color: var(--red); }
+  .warn { color: var(--yellow); }
+
+  .result-box { background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+                padding: 0.75rem; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-word; }
+  .stats { color: var(--fg2); font-size: 0.85rem; margin-top: 0.4rem; }
+
+  .htmx-indicator { display: none; }
+  .htmx-request .htmx-indicator { display: inline; }
+  .htmx-request.htmx-indicator { display: inline; }
+  .spinner { color: var(--yellow); }
+
+  #feedback { min-height: 1.5rem; margin-top: 0.5rem; }
+</style>
+</head>
+<body>
+
+<h1>mymps <span style="color: var(--fg2); font-weight: 400;">dashboard</span></h1>
+
+<!-- ── Health ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Server Health
+    <span class="spinner htmx-indicator" id="health-spinner">...</span>
+  </h2>
+  <div id="health-panel"
+       hx-get="/partials/health"
+       hx-trigger="load, every 5s"
+       hx-indicator="#health-spinner">
+    <span class="fg2">loading...</span>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- ── Models ──────────────────────────────────────── -->
+  <div class="card">
+    <h2>Loaded Models
+      <span class="spinner htmx-indicator" id="models-spinner">...</span>
+    </h2>
+    <div id="models-panel"
+         hx-get="/partials/models"
+         hx-trigger="load, every 5s, modelsChanged from:body"
+         hx-indicator="#models-spinner">
+      <span class="fg2">loading...</span>
+    </div>
+  </div>
+
+  <!-- ── Load / Unload ──────────────────────────────── -->
+  <div class="card">
+    <h2>Model Management</h2>
+    <form hx-post="/actions/load" hx-target="#mgmt-feedback" hx-on::after-request="htmx.trigger(document.body, 'modelsChanged')">
+      <div class="row">
+        <div style="flex:3"><label>HuggingFace model</label>
+          <input name="name" placeholder="microsoft/phi-2" required></div>
+        <div style="flex:1"><label>dtype</label>
+          <select name="dtype"><option>float16</option><option>float32</option><option>bfloat16</option></select></div>
+        <div style="flex:0"><button type="submit">Load</button></div>
+      </div>
+    </form>
+    <form hx-post="/actions/unload" hx-target="#mgmt-feedback" hx-on::after-request="htmx.trigger(document.body, 'modelsChanged')"
+          style="margin-top: 0.5rem;">
+      <div class="row">
+        <div style="flex:3"><label>Model to unload</label>
+          <input name="name" placeholder="microsoft/phi-2" required></div>
+        <div style="flex:0"><button type="submit" class="danger">Unload</button></div>
+      </div>
+    </form>
+    <div id="mgmt-feedback"></div>
+  </div>
+
+</div>
+
+<!-- ── Generate ──────────────────────────────────────── -->
+<div class="card">
+  <h2>Generate</h2>
+  <form hx-post="/actions/generate" hx-target="#gen-result" hx-indicator="#gen-spinner">
+    <div class="row">
+      <div style="flex:2"><label>Model</label>
+        <input name="model" placeholder="microsoft/phi-2" required></div>
+      <div><label>Max tokens</label>
+        <input name="max_new_tokens" type="number" value="128"></div>
+      <div><label>Temperature</label>
+        <input name="temperature" type="number" step="0.1" value="0.7"></div>
+    </div>
+    <div style="margin-bottom: 0.5rem;">
+      <label>Prompt</label>
+      <textarea name="prompt" placeholder="The meaning of life is" required></textarea>
+    </div>
+    <button type="submit">Generate</button>
+    <span class="spinner htmx-indicator" id="gen-spinner"> generating...</span>
+  </form>
+  <div id="gen-result"></div>
+</div>
+
+</body>
+</html>

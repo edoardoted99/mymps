@@ -1,0 +1,10 @@
+{% if ok %}
+<div class="kv"><span class="k">status</span><span class="v"><span class="dot on"></span>online</span></div>
+<div class="kv"><span class="k">device</span><span class="v">{{ info.get("device", "?") }}</span></div>
+<div class="kv"><span class="k">mps available</span><span class="v">{{ info.get("mps_available", "?") }}</span></div>
+<div class="kv"><span class="k">torch</span><span class="v">{{ info.get("torch_version", "?") }}</span></div>
+<div class="kv"><span class="k">models loaded</span><span class="v">{{ info.get("models_loaded", 0) }}</span></div>
+{% else %}
+<div class="kv"><span class="k">status</span><span class="v"><span class="dot off"></span>offline</span></div>
+<div class="kv"><span class="k">error</span><span class="v err">{{ error }}</span></div>
+{% endif %}

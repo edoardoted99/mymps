@@ -1,0 +1,10 @@
+{% if models %}
+<table>
+  <tr><th>name</th><th>device</th></tr>
+  {% for m in models %}
+  <tr><td>{{ m.name }}</td><td>{{ m.device }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="empty">no models loaded</p>
+{% endif %}

@@ -86,6 +86,18 @@ client.unload_model("microsoft/phi-2")
 client.close()
 ```
 
+### 4. Dashboard (on Linux)
+
+```bash
+pip install -e '.[dashboard]'
+python -m mymps.dashboard
+# opens at http://localhost:8080
+```
+
+A minimal web UI (Flask + htmx) that auto-refreshes every 5s showing server health, loaded models, and lets you load/unload models and run generation — all through the tunnel.
+
+Configure with: `MYMPS_DASH_HOST`, `MYMPS_DASH_PORT`, `MYMPS_SERVER_HOST`, `MYMPS_SERVER_PORT`.
+
 ## API
 
 ### REST
@@ -116,7 +128,10 @@ src/mymps/
 │   ├── inference.py     # Generic forward pass
 │   ├── streaming.py     # Token-by-token WebSocket generation
 │   └── routes.py        # All HTTP + WS endpoints
-└── client/
-    ├── client.py        # MympsClient (sync HTTP + async WS)
-    └── stream.py        # TokenStream async iterator
+├── client/
+│   ├── client.py        # MympsClient (sync HTTP + async WS)
+│   └── stream.py        # TokenStream async iterator
+└── dashboard/
+    ├── app.py           # Flask app (htmx partials)
+    └── templates/       # Single-page dark UI
 ```
