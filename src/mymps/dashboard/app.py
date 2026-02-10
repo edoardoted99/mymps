@@ -38,13 +38,13 @@ def create_app() -> Flask:
         except Exception as exc:
             return render_template("_health.html", info={}, ok=False, error=str(exc))
 
-    @app.get("/partials/models")
-    def partial_models():
+    @app.get("/partials/stats")
+    def partial_stats():
         try:
             with _client() as c:
-                models = c.list_models()
-            return render_template("_models.html", models=models)
-        except Exception:
-            return render_template("_models.html", models=[])
+                stats = c.stats()
+            return render_template("_stats.html", stats=stats, ok=True)
+        except Exception as exc:
+            return render_template("_stats.html", stats={}, ok=False, error=str(exc))
 
     return app

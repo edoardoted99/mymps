@@ -18,6 +18,7 @@ server = [
     "torch>=2.1",
     "uvicorn[standard]>=0.24",
     "fastapi>=0.108",
+    "psutil>=5.9",
 ]
 huggingface = [
     "transformers>=4.36",

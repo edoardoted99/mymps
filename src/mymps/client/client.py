@@ -18,6 +18,7 @@ from mymps.protocol import (
     EP_MODELS,
     EP_MODELS_LOAD,
     EP_OPS,
+    EP_STATS,
 )
 
 
@@ -52,6 +53,9 @@ class MympsClient:
 
     def list_ops(self) -> list[str]:
         return self._http.get(EP_OPS).raise_for_status().json()["ops"]
+
+    def stats(self) -> dict:
+        return self._http.get(EP_STATS).raise_for_status().json()
 
     # --- Model management ---------------------------------------------------
 

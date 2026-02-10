@@ -19,6 +19,9 @@
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px;
           padding: 1.25rem; margin-bottom: 1.25rem; }
 
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
   .kv { display: flex; justify-content: space-between; padding: 0.3rem 0;
         border-bottom: 1px solid var(--border); }
   .kv:last-child { border-bottom: none; }
@@ -29,12 +32,9 @@
   .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .dot.off { background: var(--red); box-shadow: 0 0 6px var(--red); }
 
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; color: var(--fg2); font-weight: 500; padding: 0.4rem 0.6rem;
-       border-bottom: 1px solid var(--border); font-size: 0.85rem; }
-  td { padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
-  tr:last-child td { border-bottom: none; }
-  .empty { color: var(--fg2); font-style: italic; padding: 0.5rem 0; }
+  .section-label { color: var(--blue); font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+                   letter-spacing: 0.05em; padding-bottom: 0.2rem; border-bottom: 1px solid var(--border);
+                   margin-bottom: 0.1rem; }
 
   .err { color: var(--red); }
 
@@ -48,30 +48,34 @@
 
 <h1>mymps <span style="color: var(--fg2); font-weight: 400;">compute coprocessor</span></h1>
 
-<!-- ── Health ──────────────────────────────────────── -->
-<div class="card">
-  <h2>Server Health
-    <span class="spinner htmx-indicator" id="health-spinner">...</span>
-  </h2>
-  <div id="health-panel"
-       hx-get="/partials/health"
-       hx-trigger="load, every 5s"
-       hx-indicator="#health-spinner">
-    <span class="fg2">loading...</span>
-  </div>
-</div>
+<div class="grid">
 
-<!-- ── Models ──────────────────────────────────────── -->
-<div class="card">
-  <h2>Loaded Models
-    <span class="spinner htmx-indicator" id="models-spinner">...</span>
-  </h2>
-  <div id="models-panel"
-       hx-get="/partials/models"
-       hx-trigger="load, every 5s"
-       hx-indicator="#models-spinner">
-    <span class="fg2">loading...</span>
+  <!-- ── Health ──────────────────────────────────────── -->
+  <div class="card">
+    <h2>Server Health
+      <span class="spinner htmx-indicator" id="health-spinner">...</span>
+    </h2>
+    <div id="health-panel"
+         hx-get="/partials/health"
+         hx-trigger="load, every 5s"
+         hx-indicator="#health-spinner">
+      <span class="fg2">loading...</span>
+    </div>
   </div>
+
+  <!-- ── System Stats ──────────────────────────────────── -->
+  <div class="card">
+    <h2>System Stats
+      <span class="spinner htmx-indicator" id="stats-spinner">...</span>
+    </h2>
+    <div id="stats-panel"
+         hx-get="/partials/stats"
+         hx-trigger="load, every 3s"
+         hx-indicator="#stats-spinner">
+      <span class="fg2">loading...</span>
+    </div>
+  </div>
+
 </div>
 
 </body>

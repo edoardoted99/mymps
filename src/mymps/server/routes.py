@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from mymps import tensor
-from mymps.protocol import EP_EXEC, EP_HEALTH, EP_INFER, EP_MODELS, EP_MODELS_LOAD, EP_OPS
+from mymps.protocol import EP_EXEC, EP_HEALTH, EP_INFER, EP_MODELS, EP_MODELS_LOAD, EP_OPS, EP_STATS
 from mymps.server.device import device_info
 from mymps.server.inference import run_inference
 from mymps.server.ops import get_op, list_ops
@@ -90,6 +90,37 @@ async def infer(request: Request):
     except TypeError as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
     return Response(content=tensor.encode_batch(outputs), media_type="application/x-msgpack")
+
+
+@router.get(EP_STATS)
+async def stats():
+    """System resource usage — CPU, memory, MPS memory."""
+    import os
+    import psutil
+
+    proc = psutil.Process(os.getpid())
+    vm = psutil.virtual_memory()
+
+    info: dict = {
+        "cpu_percent": psutil.cpu_percent(interval=None),
+        "cpu_count": psutil.cpu_count(),
+        "load_avg": list(os.getloadavg()),
+        "memory_total_gb": round(vm.total / (1024 ** 3), 2),
+        "memory_used_gb": round(vm.used / (1024 ** 3), 2),
+        "memory_percent": vm.percent,
+        "process_rss_mb": round(proc.memory_info().rss / (1024 ** 2), 1),
+        "process_cpu_percent": proc.cpu_percent(interval=None),
+    }
+
+    # MPS memory stats (available on macOS with MPS)
+    if torch.backends.mps.is_available():
+        try:
+            info["mps_allocated_mb"] = round(torch.mps.current_allocated_memory() / (1024 ** 2), 1)
+            info["mps_driver_mb"] = round(torch.mps.driver_allocated_memory() / (1024 ** 2), 1)
+        except Exception:
+            pass
+
+    return info
 
 
 @router.get(EP_OPS)

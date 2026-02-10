@@ -1,0 +1,31 @@
+{% if ok %}
+<!-- ── CPU ── -->
+<div class="section-label">CPU</div>
+<div class="kv"><span class="k">usage</span><span class="v">{{ stats.get("cpu_percent", "?") }}%</span></div>
+<div class="kv"><span class="k">cores</span><span class="v">{{ stats.get("cpu_count", "?") }}</span></div>
+<div class="kv"><span class="k">load avg (1/5/15m)</span>
+  <span class="v">
+    {% if stats.get("load_avg") %}
+      {{ "%.2f"|format(stats.load_avg[0]) }} / {{ "%.2f"|format(stats.load_avg[1]) }} / {{ "%.2f"|format(stats.load_avg[2]) }}
+    {% else %}?{% endif %}
+  </span>
+</div>
+
+<!-- ── Memory ── -->
+<div class="section-label" style="margin-top: 0.6rem;">Memory</div>
+<div class="kv"><span class="k">system</span><span class="v">{{ stats.get("memory_used_gb", "?") }} / {{ stats.get("memory_total_gb", "?") }} GB ({{ stats.get("memory_percent", "?") }}%)</span></div>
+<div class="kv"><span class="k">server process (RSS)</span><span class="v">{{ stats.get("process_rss_mb", "?") }} MB</span></div>
+
+<!-- ── MPS GPU ── -->
+{% if stats.get("mps_allocated_mb") is not none %}
+<div class="section-label" style="margin-top: 0.6rem;">MPS GPU</div>
+<div class="kv"><span class="k">allocated</span><span class="v">{{ stats.get("mps_allocated_mb", "0") }} MB</span></div>
+<div class="kv"><span class="k">driver</span><span class="v">{{ stats.get("mps_driver_mb", "0") }} MB</span></div>
+{% endif %}
+
+<!-- ── Process ── -->
+<div class="section-label" style="margin-top: 0.6rem;">Server Process</div>
+<div class="kv"><span class="k">CPU</span><span class="v">{{ stats.get("process_cpu_percent", "?") }}%</span></div>
+{% else %}
+<div class="kv"><span class="k">stats</span><span class="v err">{{ error }}</span></div>
+{% endif %}
