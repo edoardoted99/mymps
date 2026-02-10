@@ -1,11 +1,13 @@
-"""Minimal Flask dashboard for monitoring the mymps server."""
+"""Minimal Flask dashboard for monitoring the mymps compute coprocessor."""
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, Response
+import numpy as np
+from flask import Flask, render_template, request
 
 from mymps.client.client import MympsClient
 from mymps.protocol import DEFAULT_HOST, DEFAULT_PORT
@@ -52,12 +54,21 @@ def create_app() -> Flask:
     @app.post("/actions/load")
     def action_load():
         name = request.form.get("name", "").strip()
+        model_type = request.form.get("model_type", "huggingface").strip()
         dtype = request.form.get("dtype", "float16").strip()
+        model_path = request.form.get("model_path", "").strip() or None
+        model_class = request.form.get("model_class", "").strip() or None
         if not name:
             return "<p class='err'>Model name required</p>", 400
         try:
             with _client() as c:
-                result = c.load_model(name, dtype=dtype)
+                result = c.load_model(
+                    name,
+                    model_type=model_type,
+                    dtype=dtype,
+                    model_path=model_path,
+                    model_class=model_class,
+                )
             return f"<p class='ok'>Loaded <b>{result['name']}</b> on {result['device']}</p>"
         except Exception as exc:
             return f"<p class='err'>{exc}</p>", 500
@@ -74,22 +85,24 @@ def create_app() -> Flask:
         except Exception as exc:
             return f"<p class='err'>{exc}</p>", 500
 
-    @app.post("/actions/generate")
-    def action_generate():
-        model = request.form.get("model", "").strip()
-        prompt = request.form.get("prompt", "").strip()
-        max_tokens = int(request.form.get("max_new_tokens", 128))
-        temperature = float(request.form.get("temperature", 0.7))
-        if not model or not prompt:
-            return "<p class='err'>Model and prompt required</p>", 400
+    @app.post("/actions/exec")
+    def action_exec():
+        op = request.form.get("op", "").strip()
+        tensor_json = request.form.get("tensors", "").strip()
+        kwargs_json = request.form.get("kwargs", "").strip()
+        if not op:
+            return "<p class='err'>Operation name required</p>", 400
+        if not tensor_json:
+            return "<p class='err'>Tensor data required (JSON)</p>", 400
         try:
+            raw_tensors = json.loads(tensor_json)
+            inputs = {k: np.array(v, dtype=np.float32) for k, v in raw_tensors.items()}
+            kwargs = json.loads(kwargs_json) if kwargs_json else {}
             with _client() as c:
-                result = c.generate(
-                    model, prompt,
-                    max_new_tokens=max_tokens,
-                    temperature=temperature,
-                )
-            return render_template("_generate_result.html", result=result, prompt=prompt)
+                result = c.exec(op, inputs, **kwargs)
+            # Format result for display
+            formatted = {k: v.tolist() for k, v in result.items()}
+            return render_template("_exec_result.html", op=op, result=formatted)
         except Exception as exc:
             return f"<p class='err'>{exc}</p>", 500
 

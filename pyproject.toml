@@ -4,12 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mymps"
-version = "0.1.0"
-description = "Remote MPS inference server — offload ML workloads to Apple Silicon via SSH tunnel"
+version = "0.2.0"
+description = "MPS compute coprocessor — offload PyTorch operations to Apple Silicon via SSH tunnel"
 requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.27",
-    "websockets>=13.0",
     "msgpack>=1.0",
     "numpy>=1.26",
 ]
@@ -17,11 +16,12 @@ dependencies = [
 [project.optional-dependencies]
 server = [
     "torch>=2.1",
-    "transformers>=4.36",
-    "accelerate>=0.25",
-    "diffusers>=0.25",
     "uvicorn[standard]>=0.24",
     "fastapi>=0.108",
+]
+huggingface = [
+    "transformers>=4.36",
+    "accelerate>=0.25",
     "sentencepiece>=0.2",
 ]
 dashboard = [

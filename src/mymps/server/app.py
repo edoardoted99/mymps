@@ -1,4 +1,4 @@
-"""FastAPI app factory + lifespan."""
+"""FastAPI app factory + lifespan for the MPS compute coprocessor."""
 
 from __future__ import annotations
 
@@ -15,13 +15,17 @@ log = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log.info("mymps server starting up")
+    log.info("mymps compute coprocessor starting up")
     app.state.registry = ModelRegistry()
     yield
-    log.info("mymps server shutting down")
+    log.info("mymps compute coprocessor shutting down")
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="mymps", lifespan=lifespan)
+    app = FastAPI(
+        title="mymps",
+        description="MPS compute coprocessor — offload PyTorch operations to Apple Silicon",
+        lifespan=lifespan,
+    )
     app.include_router(router)
     return app

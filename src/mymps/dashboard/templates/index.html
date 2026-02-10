@@ -74,7 +74,7 @@
 </head>
 <body>
 
-<h1>mymps <span style="color: var(--fg2); font-weight: 400;">dashboard</span></h1>
+<h1>mymps <span style="color: var(--fg2); font-weight: 400;">compute coprocessor</span></h1>
 
 <!-- ── Health ──────────────────────────────────────── -->
 <div class="card">
@@ -109,10 +109,22 @@
     <h2>Model Management</h2>
     <form hx-post="/actions/load" hx-target="#mgmt-feedback" hx-on::after-request="htmx.trigger(document.body, 'modelsChanged')">
       <div class="row">
-        <div style="flex:3"><label>HuggingFace model</label>
-          <input name="name" placeholder="microsoft/phi-2" required></div>
+        <div style="flex:2"><label>Model name / path</label>
+          <input name="name" placeholder="bert-base-uncased" required></div>
+        <div style="flex:1"><label>Type</label>
+          <select name="model_type">
+            <option value="huggingface">huggingface</option>
+            <option value="torchscript">torchscript</option>
+            <option value="checkpoint">checkpoint</option>
+          </select></div>
         <div style="flex:1"><label>dtype</label>
           <select name="dtype"><option>float16</option><option>float32</option><option>bfloat16</option></select></div>
+      </div>
+      <div class="row">
+        <div style="flex:2"><label>Model path (torchscript/checkpoint)</label>
+          <input name="model_path" placeholder="/path/to/model.pt"></div>
+        <div style="flex:2"><label>Model class (checkpoint)</label>
+          <input name="model_class" placeholder="mymodule.MyModel"></div>
         <div style="flex:0"><button type="submit">Load</button></div>
       </div>
     </form>
@@ -120,7 +132,7 @@
           style="margin-top: 0.5rem;">
       <div class="row">
         <div style="flex:3"><label>Model to unload</label>
-          <input name="name" placeholder="microsoft/phi-2" required></div>
+          <input name="name" placeholder="bert-base-uncased" required></div>
         <div style="flex:0"><button type="submit" class="danger">Unload</button></div>
       </div>
     </form>
@@ -129,26 +141,26 @@
 
 </div>
 
-<!-- ── Generate ──────────────────────────────────────── -->
+<!-- ── Compute ──────────────────────────────────────── -->
 <div class="card">
-  <h2>Generate</h2>
-  <form hx-post="/actions/generate" hx-target="#gen-result" hx-indicator="#gen-spinner">
+  <h2>Compute</h2>
+  <form hx-post="/actions/exec" hx-target="#exec-result" hx-indicator="#exec-spinner">
     <div class="row">
-      <div style="flex:2"><label>Model</label>
-        <input name="model" placeholder="microsoft/phi-2" required></div>
-      <div><label>Max tokens</label>
-        <input name="max_new_tokens" type="number" value="128"></div>
-      <div><label>Temperature</label>
-        <input name="temperature" type="number" step="0.1" value="0.7"></div>
+      <div style="flex:2"><label>Operation</label>
+        <input name="op" placeholder="matmul" required></div>
     </div>
     <div style="margin-bottom: 0.5rem;">
-      <label>Prompt</label>
-      <textarea name="prompt" placeholder="The meaning of life is" required></textarea>
+      <label>Tensors (JSON, e.g. {"0": [[1,2],[3,4]], "1": [[5,6],[7,8]]})</label>
+      <textarea name="tensors" placeholder='{"0": [[1,2],[3,4]], "1": [[5,6],[7,8]]}' required></textarea>
     </div>
-    <button type="submit">Generate</button>
-    <span class="spinner htmx-indicator" id="gen-spinner"> generating...</span>
+    <div style="margin-bottom: 0.5rem;">
+      <label>Kwargs (JSON, optional, e.g. {"dim": -1})</label>
+      <input name="kwargs" placeholder='{"dim": -1}'>
+    </div>
+    <button type="submit">Execute</button>
+    <span class="spinner htmx-indicator" id="exec-spinner"> computing...</span>
   </form>
-  <div id="gen-result"></div>
+  <div id="exec-result"></div>
 </div>
 
 </body>

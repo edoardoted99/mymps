@@ -1,7 +1,8 @@
-"""MympsClient — sync HTTP + async WebSocket client SDK."""
+"""MympsClient — sync HTTP client SDK for the MPS compute coprocessor."""
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
@@ -11,21 +12,19 @@ from mymps import tensor
 from mymps.protocol import (
     DEFAULT_HOST,
     DEFAULT_PORT,
-    EP_GENERATE,
+    EP_EXEC,
     EP_HEALTH,
     EP_INFER,
     EP_MODELS,
     EP_MODELS_LOAD,
-    WS_GENERATE,
+    EP_OPS,
 )
-from mymps.client.stream import TokenStream
 
 
 class MympsClient:
-    """Thin client for the mymps remote inference server.
+    """Thin client for the mymps MPS compute coprocessor.
 
-    All REST calls are synchronous (httpx).
-    Streaming generation returns an async ``TokenStream``.
+    All calls are synchronous (httpx).
     """
 
     def __init__(
@@ -35,7 +34,6 @@ class MympsClient:
         timeout: float = 300.0,
     ) -> None:
         self._base = f"http://{host}:{port}"
-        self._ws_base = f"ws://{host}:{port}"
         self._http = httpx.Client(base_url=self._base, timeout=timeout)
 
     def close(self) -> None:
@@ -47,10 +45,15 @@ class MympsClient:
     def __exit__(self, *exc):
         self.close()
 
-    # --- REST helpers --------------------------------------------------------
+    # --- Server info --------------------------------------------------------
 
     def health(self) -> dict:
         return self._http.get(EP_HEALTH).raise_for_status().json()
+
+    def list_ops(self) -> list[str]:
+        return self._http.get(EP_OPS).raise_for_status().json()["ops"]
+
+    # --- Model management ---------------------------------------------------
 
     def list_models(self) -> list[dict]:
         return self._http.get(EP_MODELS).raise_for_status().json()
@@ -59,16 +62,31 @@ class MympsClient:
         self,
         name: str,
         *,
+        model_type: str = "huggingface",
         dtype: str = "float16",
         trust_remote_code: bool = False,
+        model_path: str | None = None,
+        model_class: str | None = None,
     ) -> dict:
         return self._http.post(
             EP_MODELS_LOAD,
-            json={"name": name, "dtype": dtype, "trust_remote_code": trust_remote_code},
+            json={
+                "name": name,
+                "model_type": model_type,
+                "dtype": dtype,
+                "trust_remote_code": trust_remote_code,
+                "model_path": model_path,
+                "model_class": model_class,
+            },
         ).raise_for_status().json()
 
     def unload_model(self, name: str) -> dict:
         return self._http.delete(f"{EP_MODELS}/{name}").raise_for_status().json()
+
+    def model_info(self, name: str) -> dict:
+        return self._http.get(f"{EP_MODELS}/{name}/info").raise_for_status().json()
+
+    # --- Inference (model forward pass) -------------------------------------
 
     def infer(self, model: str, inputs: dict[str, np.ndarray]) -> dict[str, np.ndarray]:
         resp = self._http.post(
@@ -79,52 +97,35 @@ class MympsClient:
         resp.raise_for_status()
         return tensor.decode_batch(resp.content)
 
-    def generate(
+    # --- Exec (arbitrary torch op) ------------------------------------------
+
+    def exec(
         self,
-        model: str,
-        prompt: str,
-        *,
-        max_new_tokens: int = 256,
-        temperature: float = 1.0,
-        top_p: float = 1.0,
-    ) -> dict:
-        return self._http.post(
-            EP_GENERATE,
-            json={
-                "model": model,
-                "prompt": prompt,
-                "max_new_tokens": max_new_tokens,
-                "temperature": temperature,
-                "top_p": top_p,
-            },
-        ).raise_for_status().json()
+        op: str,
+        inputs: dict[str, np.ndarray],
+        **kwargs: Any,
+    ) -> dict[str, np.ndarray]:
+        """Execute a whitelisted torch operation on the remote MPS device.
 
-    # --- WebSocket streaming -------------------------------------------------
+        Args:
+            op: Operation name (e.g. "matmul", "softmax").
+            inputs: Named tensors. Use "0", "1", … for positional args.
+            **kwargs: Scalar keyword arguments forwarded to the op.
 
-    def stream_generate(
-        self,
-        model: str,
-        prompt: str,
-        *,
-        max_new_tokens: int = 256,
-        temperature: float = 1.0,
-        top_p: float = 1.0,
-    ) -> TokenStream:
-        """Return a ``TokenStream`` (use as ``async with``).
-
-        Example::
-
-            async with client.stream_generate("model", "Hello") as stream:
-                async for token in stream:
-                    print(token, end="")
+        Returns:
+            Dict of output tensors as numpy arrays.
         """
-        return TokenStream(
-            ws_url=f"{self._ws_base}{WS_GENERATE}",
-            payload={
-                "model": model,
-                "prompt": prompt,
-                "max_new_tokens": max_new_tokens,
-                "temperature": temperature,
-                "top_p": top_p,
-            },
+        headers: dict[str, str] = {
+            "content-type": "application/x-msgpack",
+            "x-op": op,
+        }
+        if kwargs:
+            headers["x-kwargs"] = json.dumps(kwargs)
+
+        resp = self._http.post(
+            EP_EXEC,
+            content=tensor.encode_batch(inputs),
+            headers=headers,
         )
+        resp.raise_for_status()
+        return tensor.decode_batch(resp.content)

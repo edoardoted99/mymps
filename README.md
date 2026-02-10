@@ -1,14 +1,16 @@
 # mymps
 
-Remote MPS inference server — offload ML/AI workloads from a Linux machine to a Mac with Apple Silicon, connected via SSH tunnel.
+MPS compute coprocessor — use a Mac with Apple Silicon as a remote GPU from Linux, connected via SSH tunnel.
+
+Supports: HuggingFace models (any type), TorchScript models, checkpoint + class loading, and ~100 whitelisted torch operations (matmul, softmax, conv2d, SVD, ...).
 
 ## Architecture
 
 ```
-[Linux]  MympsClient  --HTTP/WS-->  [SSH Tunnel :5555]  -->  [Mac]  FastAPI + PyTorch MPS
+[Linux]  MympsClient  --HTTP-->  [SSH Tunnel :5555]  -->  [Mac]  FastAPI + PyTorch MPS
 ```
 
-The SSH tunnel handles authentication and encryption — the server itself binds to localhost only, no extra auth needed.
+The SSH tunnel handles authentication and encryption — the server itself binds to localhost only.
 
 ## Setup
 
@@ -18,19 +20,16 @@ The SSH tunnel handles authentication and encryption — the server itself binds
 pip install -e .
 ```
 
-This installs only the lightweight client dependencies (httpx, websockets, msgpack, numpy). No PyTorch required.
+Installs only lightweight client dependencies (httpx, msgpack, numpy). No PyTorch required.
 
 ### Mac (server)
 
 ```bash
-# Option A: deploy from Linux via rsync
-./scripts/deploy.sh
-
-# Option B: manually on the Mac
 pip install -e '.[server]'
-```
 
-The `server` extra pulls in torch, transformers, accelerate, diffusers, uvicorn, and fastapi.
+# For HuggingFace model support:
+pip install -e '.[server,huggingface]'
+```
 
 ## Usage
 
@@ -40,53 +39,66 @@ The `server` extra pulls in torch, transformers, accelerate, diffusers, uvicorn,
 ./scripts/tunnel.sh
 ```
 
-This opens `localhost:5555` on Linux → forwards to port 5555 on the Mac via `ssh -p 26996 edoardo.tedesco@openport.io`.
-
-Configure with env vars: `MYMPS_USER`, `MYMPS_HOST`, `MYMPS_SSH_PORT`, `MYMPS_PORT`.
-
 ### 2. Start the server (on Mac)
 
 ```bash
-./scripts/start-server.sh
-# or directly:
 python -m mymps.server
 ```
 
-Verify with: `curl localhost:5555/health`
+Verify: `curl localhost:5555/health`
 
-### 3. Use the client (on Linux)
+### 3. Torch operations (no model needed)
 
 ```python
+import numpy as np
 from mymps import MympsClient
 
 client = MympsClient()  # connects to localhost:5555
 
-# check server
-client.health()
+# List available operations
+client.list_ops()  # → ["abs", "add", "matmul", "softmax", ...]
 
-# load a model onto MPS
-client.load_model("microsoft/phi-2")
+# Remote matmul on MPS
+A = np.random.randn(64, 128).astype(np.float32)
+B = np.random.randn(128, 32).astype(np.float32)
+result = client.exec("matmul", {"0": A, "1": B})
+C = result["output"]  # shape (64, 32)
 
-# generate text
-result = client.generate("microsoft/phi-2", "The meaning of life is", max_new_tokens=64)
-print(result["text"])
+# Remote softmax
+logits = np.random.randn(4, 10).astype(np.float32)
+probs = client.exec("softmax", {"input": logits}, dim=-1)
 
-# streaming generation
-import asyncio
-
-async def stream():
-    async with client.stream_generate("microsoft/phi-2", "Write a poem:\n") as s:
-        async for token in s:
-            print(token, end="", flush=True)
-
-asyncio.run(stream())
-
-# cleanup
-client.unload_model("microsoft/phi-2")
 client.close()
 ```
 
-### 4. Dashboard (on Linux)
+### 4. Model inference
+
+```python
+from mymps import MympsClient
+
+client = MympsClient()
+
+# Load a HuggingFace model (generic AutoModel, not CausalLM)
+client.load_model("bert-base-uncased")
+
+# Forward pass with raw tensors
+import numpy as np
+input_ids = np.array([[101, 2023, 2003, 1037, 3231, 102]], dtype=np.int64)
+result = client.infer("bert-base-uncased", {"input_ids": input_ids})
+
+# Load a TorchScript model (file must exist on the Mac)
+client.load_model("my-model", model_type="torchscript", model_path="/path/to/model.pt")
+
+# Load a checkpoint with a custom class
+client.load_model("my-model", model_type="checkpoint",
+                  model_path="/path/to/weights.pt",
+                  model_class="mypackage.MyModel")
+
+client.unload_model("bert-base-uncased")
+client.close()
+```
+
+### 5. Dashboard
 
 ```bash
 pip install -e '.[dashboard]'
@@ -94,44 +106,37 @@ python -m mymps.dashboard
 # opens at http://localhost:8080
 ```
 
-A minimal web UI (Flask + htmx) that auto-refreshes every 5s showing server health, loaded models, and lets you load/unload models and run generation — all through the tunnel.
-
-Configure with: `MYMPS_DASH_HOST`, `MYMPS_DASH_PORT`, `MYMPS_SERVER_HOST`, `MYMPS_SERVER_PORT`.
+Web UI for monitoring server health, managing models, and running compute operations.
 
 ## API
 
-### REST
-
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Server status + MPS GPU info |
+| `GET` | `/health` | Server status + MPS device info |
 | `GET` | `/models` | List loaded models |
-| `POST` | `/models/load` | Load a HuggingFace model onto MPS |
+| `POST` | `/models/load` | Load a model (huggingface / torchscript / checkpoint) |
 | `DELETE` | `/models/{name}` | Unload a model |
-| `POST` | `/infer` | Raw tensor inference (msgpack binary) |
-| `POST` | `/generate` | Text generation (non-streaming) |
-
-### WebSocket
-
-`/ws/generate` — client sends `{model, prompt, max_new_tokens, temperature, top_p}`, server streams back `{type: "token", text: "..."}` per token, then `{type: "done", ...}` with stats.
+| `GET` | `/models/{name}/info` | Model details + metadata |
+| `POST` | `/infer` | Forward pass (msgpack tensors, `x-model` header) |
+| `GET` | `/ops` | List available torch operations |
+| `POST` | `/exec` | Execute a torch op (`x-op` header, `x-kwargs` JSON header, msgpack tensors) |
 
 ## Project structure
 
 ```
 src/mymps/
-├── protocol.py          # Shared constants (endpoints, message types)
-├── tensor.py            # numpy <-> msgpack serialization
+├── protocol.py          # Shared constants (endpoints)
+├── tensor.py            # numpy ↔ msgpack serialization
 ├── server/
 │   ├── app.py           # FastAPI factory + lifespan
 │   ├── device.py        # MPS device detection
-│   ├── models.py        # Model registry (load/unload/list)
+│   ├── models.py        # Model registry (3 loading strategies)
 │   ├── inference.py     # Generic forward pass
-│   ├── streaming.py     # Token-by-token WebSocket generation
-│   └── routes.py        # All HTTP + WS endpoints
+│   ├── ops.py           # Whitelisted torch operations
+│   └── routes.py        # All HTTP endpoints
 ├── client/
-│   ├── client.py        # MympsClient (sync HTTP + async WS)
-│   └── stream.py        # TokenStream async iterator
+│   └── client.py        # MympsClient (sync HTTP)
 └── dashboard/
-    ├── app.py           # Flask app (htmx partials)
-    └── templates/       # Single-page dark UI
+    ├── app.py           # Flask app (htmx)
+    └── templates/       # Dashboard UI
 ```
